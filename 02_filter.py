@@ -65,26 +65,50 @@ def is_likely_residential(address):
     return has_residential and not has_commercial
 
 
+ADJACENT_MUNICIPALITY_PREFIXES = {
+    # Burlington
+    "L7L", "L7M", "L7N", "L7R", "L7S", "L7T",
+    # Mississauga
+    "L5J", "L5K", "L5L", "L5A", "L5B", "L5C", "L5G", "L5H",
+}
+
+
 def gate_geography(df):
-    """Gate 1: Must be within Oakville geographic boundaries."""
+    """Gate 1: Must be within Oakville geographic boundaries.
+
+    Two-stage filter:
+      Stage A: keep if address contains an Oakville postal prefix OR
+               falls within lat/lng bounds.
+      Stage B: hard-exclude any lead whose address contains a known
+               adjacent-municipality prefix (Burlington, Mississauga),
+               even if it slipped through Stage A via lat/lng overlap.
+    """
     before = len(df)
 
-    # Try postal code first
+    # Stage A: postal prefix OR lat/lng bounds
     has_postal = df["address_raw"].str.contains(
         "|".join(TARGET_POSTAL_PREFIXES), case=False, na=False
     )
-
-    # Fall back to lat/lng bounds for entries without postal code match
     in_bounds = (
         (df["lat"] >= GEO_BOUNDS["south"]) &
         (df["lat"] <= GEO_BOUNDS["north"]) &
         (df["lng"] >= GEO_BOUNDS["west"]) &
         (df["lng"] <= GEO_BOUNDS["east"])
     )
-
     df = df[has_postal | in_bounds].copy()
+    after_stage_a = len(df)
+
+    # Stage B: hard-exclude known adjacent-municipality postal prefixes
+    adjacent_pattern = "|".join(ADJACENT_MUNICIPALITY_PREFIXES)
+    in_adjacent = df["address_raw"].str.contains(
+        adjacent_pattern, case=False, na=False
+    )
+    n_adjacent = in_adjacent.sum()
+    df = df[~in_adjacent].copy()
+
     after = len(df)
-    print(f"  Gate 1 (Geography):  {before} -> {after}  (removed {before - after})")
+    print(f"  Gate 1 (Geography):  {before} -> {after}  (removed {before - after})"
+          f"  [stage A: -{before - after_stage_a}, adjacent spill: -{n_adjacent}]")
     return df
 
 
