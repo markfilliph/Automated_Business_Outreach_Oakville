@@ -24,7 +24,7 @@ from datetime import datetime
 import sys
 import os
 
-from utils.employee_estimator import estimate_employee_range
+from utils.employee_estimator import estimate_employee_range, estimate_business_age
 
 sys.path.insert(0, os.path.dirname(__file__))
 from config import (
@@ -168,6 +168,13 @@ def score_years_in_business(row):
     """Older businesses score higher. 30 years = 100 points."""
     reg_date = row.get("registration_date") or row.get("established_date")
     if pd.isna(reg_date) or reg_date is None:
+        # Fallback: use estimated_years from review count proxy
+        est = row.get("estimated_years")
+        if est is not None:
+            try:
+                return min((float(est) / 30.0) * 100, 100.0)
+            except (ValueError, TypeError):
+                pass
         return 15.0  # Conservative default
 
     try:

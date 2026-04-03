@@ -39,6 +39,7 @@ from config import (
 )
 from utils.cache import cache_get, cache_set
 from utils.website_validator import validate_website
+from utils.employee_estimator import estimate_business_age
 
 DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
 CACHE_DIR = "data/cache/details"
@@ -109,6 +110,12 @@ def enrich_row(row, details):
     row["website"] = details.get("website", row.get("website", ""))
     row["google_rating"] = details.get("rating", row.get("google_rating"))
     row["review_count"] = details.get("user_ratings_total", row.get("review_count", 0))
+
+    # Estimate business age from review count proxy
+    age_est = estimate_business_age(row["review_count"])
+    if age_est is not None:
+        row["estimated_years"] = age_est["estimated_years"]
+
     new_types = details.get("types", [])
     if new_types:
         row["google_types"] = ",".join(new_types)

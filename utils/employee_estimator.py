@@ -109,6 +109,39 @@ def estimate_employee_range(row):
     return None
 
 
+def estimate_business_age(review_count):
+    """Estimate business age in years from Google review count.
+
+    Review volume is a weak but non-zero proxy for longevity — businesses
+    accumulate reviews over time. Returns a (years_midpoint, label) tuple,
+    or None if no reviews are available.
+
+    Thresholds (conservative — biased toward underestimating age):
+      100+ reviews  → likely 15+ years  (midpoint: 18)
+       50-99        → likely 10-15 years (midpoint: 12)
+       20-49        → likely 5-10 years  (midpoint: 7)
+        5-19        → likely 3-5 years   (midpoint: 4)
+        1-4         → likely 1-3 years   (midpoint: 2)
+        0           → unknown            (None)
+    """
+    try:
+        reviews = int(float(review_count)) if review_count is not None else 0
+    except (ValueError, TypeError):
+        reviews = 0
+
+    if reviews >= 100:
+        return {"estimated_years": 18, "age_label": "15+ years (review proxy)"}
+    elif reviews >= 50:
+        return {"estimated_years": 12, "age_label": "10-15 years (review proxy)"}
+    elif reviews >= 20:
+        return {"estimated_years": 7,  "age_label": "5-10 years (review proxy)"}
+    elif reviews >= 5:
+        return {"estimated_years": 4,  "age_label": "3-5 years (review proxy)"}
+    elif reviews >= 1:
+        return {"estimated_years": 2,  "age_label": "1-3 years (review proxy)"}
+    return None
+
+
 def _midpoint_to_range(emp):
     """Convert a known employee count to a display range string."""
     if emp <= 5:
