@@ -1,7 +1,7 @@
 # Oakville Acquisition MVP — Project Tracker
 
 **Goal:** Generate 100 scored acquisition leads (SDE $250K–$500K, Oakville ON)
-**Last updated:** 2026-04-01
+**Last updated:** 2026-04-03
 
 ---
 
@@ -77,6 +77,22 @@
 
 ---
 
+## PHASE 4 — QUALITY FIXES
+
+| # | Task | File(s) | Status | Notes |
+|---|------|---------|--------|-------|
+| 4.1 | Fix category classifier substring bug | `07_export.py` | ✅ Done | Left-anchored `\b` word boundary prevents "charnwood"→Wood/Millwork, "engineer"→Engineering false positives |
+| 4.2 | Fix company name cleaning | `01_ingest.py` | ✅ Done | Strips pipe-delimited marketing junk, location tags (` - Oakville`), promo parentheses, comma-list collapse (3+ names → first) |
+| 4.3 | Add residential address detection flag | `02_filter.py`, `07_export.py` | ✅ Done | Non-blocking flag; street type abbreviations (Dr, Cres, Crt, etc.) added; `residential_flag` column + `FLAG:` note in export |
+| 4.4 | Tighten chain/franchise filter | `utils/chain_filter.py` | ✅ Done | +30 entries: plumbing franchises, hotel chains, waste/facilities corps, major construction/engineering (PCL, EllisDon, Aecon, Stantec, WSP, SNC-Lavalin, AECOM, Jacobs) |
+| 4.5 | Add employee count estimation heuristic | `utils/employee_estimator.py`, `06_score.py` | ✅ Done | 4-rule chain: direct → Google type baseline → review count proxy → B2B name signal; used in scoring before hardcoded default |
+| 4.6 | Hard-filter SDE out-of-range leads in export | `07_export.py` | ✅ Done | Removes leads with SDE below $250K or above $500K after top-N selection; backfills from remaining pool |
+| 4.7 | Tighten geographic filter — adjacent municipality spill | `02_filter.py` | ✅ Done | Stage B hard-excludes Burlington (L7L–L7T) and Mississauga (L5A–L5L) postal prefixes even if lat/lng overlaps |
+| 4.8 | Add business age estimation from Google data | `utils/employee_estimator.py`, `03_enrich_google.py`, `06_score.py` | ✅ Done | `estimate_business_age()` uses review count proxy; stored as `estimated_years`; used as fallback in `score_years_in_business()` |
+| 4.9 | Raise enrichment cap to cover all filtered candidates | `config.py`, `03_enrich_google.py` | ✅ Done | `MAX_COST_USD_03` $5→$40; `MAX_DETAILS_CANDIDATES` 200→2100; enriches all 2,049 candidates (~$35 at $0.017/call) |
+
+---
+
 ## PHASE 3 — VALIDATION
 
 | # | Task | Status | Notes |
@@ -93,11 +109,15 @@
 
 ## KNOWN LIMITATIONS / DECISIONS
 
-- **No REQ equivalent:** Ontario has no public enterprise registry. Owner enrichment relies on OpenCorporates (free tier: 500 req/mo) + manual fallback.
+- **No REQ equivalent:** Ontario has no public enterprise registry. Owner enrichment uses BBB Canada scraping + HuggingFace NER (dslim/bert-base-NER) + DuckDuckGo SERP as a 3-source chain. ~36% hit rate in practice.
+- **Employee estimates are heuristic-based:** Derived from review count thresholds and Google place types — not from a verified source (LinkedIn, D&B, or CFIB). Treat as order-of-magnitude proxies only.
+- **Business age estimates are weak proxies:** `estimated_years` is back-calculated from Google review count accumulation. Businesses that discourage reviews or operate B2B will be systematically underestimated.
+- **Revenue/SDE estimates remain LOW confidence** without external data sources (LinkedIn Sales Navigator, D&B Hoovers, Industry Canada NAICS benchmarks). Current estimates use employee midpoint × revenue-per-employee × industry margin heuristics.
+- **Name cleaning covers common patterns but not all edge cases:** Pipe-delimited marketing text (e.g. "Acme Plumbing | Oakville's #1 Choice") is stripped at ingestion. Unusual formatting or multi-language names may still require manual review.
 - **SDE estimates are rough proxies:** Employee count × revenue per employee × industry margin. Confidence tagged HIGH/MODERATE/LOW in output.
 - **Google Places data is B2C-biased:** B2B companies (manufacturing, wholesale) often have zero reviews. B2B keyword boost (+15–25 pre-score points) compensates.
-- **Cost estimate:** Full pipeline run ≈ $6–$11 USD in Google API calls if run fresh (no cache).
-- **Step 05 is optional:** Can skip if no OpenCorporates token; pipeline reads `deduped_candidates.csv` as fallback.
+- **Cost estimate:** Full pipeline run ≈ $40–$45 USD in Google API calls if run fresh (no cache) with full enrichment of all 2,049 candidates.
+- **Step 05 is optional:** Can skip if no enrichment sources available; pipeline reads `deduped_candidates.csv` as fallback.
 
 ---
 
