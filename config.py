@@ -202,9 +202,9 @@ TARGET_FINAL_LEADS = 100          # Number of leads to export
 # Revenue is estimated from employee count, reviews, industry, and age.
 # SDE is then calculated from revenue using industry-specific margins.
 REVENUE_ESTIMATION = {
-    "per_employee_low": 100_000,   # Conservative: $100K revenue per employee
+    "per_employee_low": 120_000,   # Conservative: $120K revenue per employee
     "per_employee_mid": 150_000,   # Moderate estimate
-    "per_employee_high": 220_000,  # Aggressive estimate
+    "per_employee_high": 185_000,  # Aggressive estimate
     "base_range": (800_000, 5_000_000),  # Wider base for this SDE range
     "confidence_margin": 0.30,     # +/- 30% for low/high estimates
     "review_adjustment": 0.12,     # Review count adjusts estimate by up to 12%
