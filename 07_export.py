@@ -215,9 +215,43 @@ def format_employee_range(emp_count):
         return "Unknown"
 
 
+_RESIDENTIAL_STREET_TYPES = [
+    # Full names
+    "crescent", "drive", "court", "terrace", "trail",
+    "way", "lane", "circle", "place", "grove", "gardens", "heights",
+    # Google Maps abbreviations
+    "cres", "dr", "crt", "ct", "terr", "trl", "ln", "cir", "pl", "hts",
+]
+_COMMERCIAL_INDICATORS = [
+    "industrial", "business park", "unit", "suite", "floor", "#",
+]
+
+
+def is_likely_residential(address):
+    """Return True if address looks like a home address.
+
+    Positive signal: contains a residential street type.
+    Negative signal (commercial override): contains a unit/suite/industrial marker.
+    """
+    if not address or pd.isna(address):
+        return False
+    addr_lower = str(address).lower()
+    has_residential = any(
+        re.search(r'\b' + re.escape(st) + r'\b', addr_lower)
+        for st in _RESIDENTIAL_STREET_TYPES
+    )
+    has_commercial = any(ind in addr_lower for ind in _COMMERCIAL_INDICATORS)
+    return has_residential and not has_commercial
+
+
 def compose_notes(row, category):
     """Compose the important_notes field."""
     notes_parts = []
+
+    # Residential address flag (prepended so broker sees it immediately)
+    address = row.get("address_raw", "") or row.get("address", "")
+    if is_likely_residential(address):
+        notes_parts.append("FLAG: Residential address (likely home-based)")
 
     # Category tag
     notes_parts.append(f"Category: {category}")

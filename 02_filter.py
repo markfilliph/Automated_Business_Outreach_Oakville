@@ -16,6 +16,7 @@ Output: data/filtered_candidates.csv
 """
 
 import pandas as pd
+import re
 import sys
 import os
 
@@ -33,6 +34,35 @@ from config import (
 )
 from utils.chain_filter import is_chain_or_franchise
 from utils.subsidiary_detector import is_subsidiary
+
+
+_RESIDENTIAL_STREET_TYPES = [
+    # Full names
+    "crescent", "drive", "court", "terrace", "trail",
+    "way", "lane", "circle", "place", "grove", "gardens", "heights",
+    # Google Maps abbreviations
+    "cres", "dr", "crt", "ct", "terr", "trl", "ln", "cir", "pl", "hts",
+]
+_COMMERCIAL_INDICATORS = [
+    "industrial", "business park", "unit", "suite", "floor", "#",
+]
+
+
+def is_likely_residential(address):
+    """Return True if address looks like a home address.
+
+    Positive signal: contains a residential street type.
+    Negative signal (commercial override): contains a unit/suite/industrial marker.
+    """
+    if not address or pd.isna(address):
+        return False
+    addr_lower = str(address).lower()
+    has_residential = any(
+        re.search(r'\b' + re.escape(st) + r'\b', addr_lower)
+        for st in _RESIDENTIAL_STREET_TYPES
+    )
+    has_commercial = any(ind in addr_lower for ind in _COMMERCIAL_INDICATORS)
+    return has_residential and not has_commercial
 
 
 def gate_geography(df):
@@ -174,6 +204,11 @@ def main():
     df = gate_chains(df)
     df = gate_subsidiaries(df)
     df = gate_employee_signal(df)
+
+    # Annotate residential addresses (non-blocking — does not filter)
+    df["residential_flag"] = df["address_raw"].apply(is_likely_residential)
+    residential_count = df["residential_flag"].sum()
+    print(f"  Residential flag:    {residential_count} addresses flagged as likely home-based")
 
     print()
     print(f"  [OUTPUT] {len(df)} filtered candidates -> {CHECKPOINT_FILTERED}")
