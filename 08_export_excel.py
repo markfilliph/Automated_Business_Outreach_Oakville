@@ -239,6 +239,8 @@ def main():
     print("=" * 60)
 
     df = pd.read_csv(OUTPUT_FINAL)
+    if "review_status" not in df.columns:
+        df["review_status"] = ""
     df["review_status"] = df["review_status"].fillna("").astype(str)
     print(f"  [INPUT] {len(df)} leads from {OUTPUT_FINAL}")
 
