@@ -206,7 +206,9 @@ REVENUE_ESTIMATION = {
     "per_employee_mid": 150_000,   # Moderate estimate
     "per_employee_high": 185_000,  # Aggressive estimate
     "base_range": (800_000, 5_000_000),  # Wider base for this SDE range
-    "confidence_margin": 0.30,     # +/- 30% for low/high estimates
+    "confidence_margin_low": 0.30,      # +/- 30% when only base confidence (no signals)
+    "confidence_margin_moderate": 0.15, # +/- 15% when one signal (employee or review count)
+    "confidence_margin_high": 0.08,     # +/- 8%  when multiple signals
     "review_adjustment": 0.12,     # Review count adjusts estimate by up to 12%
     "years_adjustment": 0.12,      # Years in business adjusts by up to 12%
     "website_adjustment": 0.08,    # Website presence adjusts by up to 8%

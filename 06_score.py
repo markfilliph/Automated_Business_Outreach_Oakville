@@ -88,7 +88,12 @@ def estimate_revenue(row):
             rev_review_mid = 1_000_000
         else:
             rev_review_mid = 700_000
-        margin = REVENUE_ESTIMATION["confidence_margin"]
+        if confidence >= 45:
+            margin = REVENUE_ESTIMATION["confidence_margin_high"]
+        elif confidence >= 30:
+            margin = REVENUE_ESTIMATION["confidence_margin_moderate"]
+        else:
+            margin = REVENUE_ESTIMATION["confidence_margin_low"]
         signals.append(("reviews",
                         rev_review_mid * (1 - margin),
                         rev_review_mid,
