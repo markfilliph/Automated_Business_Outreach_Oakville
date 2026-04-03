@@ -28,12 +28,13 @@ Output: data/top_100_for_review.csv
 """
 
 import re
-import pandas as pd
-from datetime import datetime
 import sys
 import os
+import pandas as pd
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(__file__))
+from utils.employee_estimator import estimate_employee_range
 from config import (
     CHECKPOINT_SCORED,
     OUTPUT_FINAL,
@@ -301,6 +302,19 @@ def compose_notes(row, category):
     return " | ".join(notes_parts)
 
 
+
+def _get_employee_range(row):
+    """Return employee range string, using estimator when num_employees is missing."""
+    emp = row.get("num_employees")
+    if pd.notna(emp) and str(emp).strip() not in ("", "nan", "None", "0"):
+        return format_employee_range(emp)
+    # Fall back to estimator range string
+    result = estimate_employee_range(row)
+    if result:
+        return result["employee_range"]
+    return "Unknown"
+
+
 def transform_row(row):
     """Transform a scored pipeline row into Hamilton standard format."""
     # Build text for classification
@@ -351,7 +365,7 @@ def transform_row(row):
         "owner_source": owner_source,
         "industry": industry_label,
         "category_standardized": category,
-        "employee_range_estimate": format_employee_range(row.get("num_employees")),
+        "employee_range_estimate": _get_employee_range(row),
         "revenue_range_estimate": revenue_range,
         "sde_range_estimate": sde_range,
         "age_range_estimate": format_age_range(row),

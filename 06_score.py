@@ -24,6 +24,8 @@ from datetime import datetime
 import sys
 import os
 
+from utils.employee_estimator import estimate_employee_range
+
 sys.path.insert(0, os.path.dirname(__file__))
 from config import (
     CHECKPOINT_OWNER,
@@ -387,6 +389,20 @@ def main():
     input_file = CHECKPOINT_OWNER if os.path.exists(CHECKPOINT_OWNER) else CHECKPOINT_DEDUPED
     df = pd.read_csv(input_file)
     print(f"  [INPUT] {len(df)} candidates from {input_file}")
+
+    # Fill missing employee counts using heuristic estimator
+    if "employee_source" not in df.columns:
+        df["employee_source"] = ""
+    filled = 0
+    for idx, row in df.iterrows():
+        emp = row.get("num_employees")
+        if pd.isna(emp) or str(emp).strip() in ("", "nan", "None", "0"):
+            result = estimate_employee_range(row)
+            if result:
+                df.at[idx, "num_employees"] = result["employee_midpoint"]
+                df.at[idx, "employee_source"] = result["employee_source"]
+                filled += 1
+    print(f"\n  Employee estimation: filled {filled}/{len(df)} missing values")
 
     # Score each candidate
     print(f"\n  Scoring {len(df)} candidates (8 factors, SDE-calibrated)...")
