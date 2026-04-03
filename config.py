@@ -236,6 +236,26 @@ INDUSTRY_MARGINS = {
     "default": 0.15,
 }
 
+# Revenue per employee by industry (low, mid, high) in CAD
+# Used in estimate_revenue() to produce industry-calibrated estimates.
+# "default" is used for "general" or any unrecognized label.
+INDUSTRY_REVENUE_PER_EMPLOYEE = {
+    "manufacturing":         (130_000, 150_000, 175_000),
+    "trades":                (110_000, 140_000, 165_000),
+    "construction":          (120_000, 155_000, 190_000),
+    "transportation":        (100_000, 130_000, 160_000),
+    "wholesale":             (150_000, 200_000, 260_000),
+    "cleaning_services":     ( 80_000, 100_000, 125_000),
+    "landscaping":           ( 70_000,  90_000, 115_000),
+    "it_services":           (140_000, 175_000, 210_000),
+    "professional_services": (130_000, 165_000, 200_000),
+    "equipment_rental":      (120_000, 150_000, 185_000),
+    "healthcare_services":   (120_000, 150_000, 185_000),
+    "financial_services":    (140_000, 180_000, 220_000),
+    "staffing":              (100_000, 140_000, 180_000),
+    "default":               (120_000, 150_000, 185_000),
+}
+
 # Implied revenue ranges for SDE $250K-$500K by industry
 # (auto-calculated, used for filtering and scoring)
 def get_revenue_range_for_sde(industry):

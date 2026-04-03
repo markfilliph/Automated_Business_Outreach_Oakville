@@ -48,6 +48,7 @@ from config import (
     REVIEW_THRESHOLDS,
     REVENUE_ESTIMATION,
     INDUSTRY_MARGINS,
+    INDUSTRY_REVENUE_PER_EMPLOYEE,
     TARGET_POSTAL_PREFIXES,
     OWNER_ENRICHMENT_ENABLED,
 )
@@ -55,7 +56,7 @@ from config import (
 
 # ── Revenue and SDE estimation ────────────────────────────────────────────────
 
-def estimate_revenue(row):
+def estimate_revenue(row, industry="default"):
     """Estimate revenue range from available signals.
 
     Returns (low, mid, high, confidence) tuple.
@@ -73,7 +74,10 @@ def estimate_revenue(row):
     emp = row.get("num_employees")
     if pd.notna(emp) and float(emp) > 0:
         emp = float(emp)
-        mids.append(emp * REVENUE_ESTIMATION["per_employee_mid"])
+        rev_per_emp = INDUSTRY_REVENUE_PER_EMPLOYEE.get(
+            industry, INDUSTRY_REVENUE_PER_EMPLOYEE["default"]
+        )
+        mids.append(emp * rev_per_emp[1])  # index 1 = mid
         confidence += 25
 
     # Signal 2: Review count (weak proxy, better for B2C)
@@ -313,7 +317,7 @@ def score_sde_fit(row, industry):
     This is the key differentiator from prior projects. We estimate SDE
     and score based on how close it falls to the target range.
     """
-    rev_low, rev_mid, rev_high, confidence = estimate_revenue(row)
+    rev_low, rev_mid, rev_high, confidence = estimate_revenue(row, industry)
     margin = INDUSTRY_MARGINS.get(industry, INDUSTRY_MARGINS["default"])
 
     sde_low = rev_low * margin
@@ -461,8 +465,8 @@ def main():
     # Add revenue and SDE estimates
     rev_data = []
     for _, row in df.iterrows():
-        rev_low, rev_mid, rev_high, confidence = estimate_revenue(row)
         industry = row.get("industry_label", "general")
+        rev_low, rev_mid, rev_high, confidence = estimate_revenue(row, industry)
         margin = INDUSTRY_MARGINS.get(industry, INDUSTRY_MARGINS["default"])
         rev_data.append({
             "estimated_revenue_low": round(rev_low),
