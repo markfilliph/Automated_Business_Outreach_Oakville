@@ -27,6 +27,7 @@ Input:  data/scored_candidates.csv
 Output: data/top_100_for_review.csv
 """
 
+import re
 import pandas as pd
 from datetime import datetime
 import sys
@@ -128,7 +129,7 @@ def classify_category(text):
     """Classify a business into a standardized category based on keywords."""
     text_lower = text.lower()
     for keywords, category in CATEGORY_RULES:
-        if any(kw in text_lower for kw in keywords):
+        if any(re.search(r'\b' + re.escape(kw), text_lower) for kw in keywords):
             return category
     return "General Business"
 
