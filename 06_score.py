@@ -19,6 +19,7 @@ Input:  data/owner_enriched.csv (or data/deduped_candidates.csv if step 05 skipp
 Output: data/scored_candidates.csv
 """
 
+import re
 import pandas as pd
 from datetime import datetime
 import sys
@@ -410,6 +411,38 @@ def main():
                 df.at[idx, "employee_source"] = result["employee_source"]
                 filled += 1
     print(f"\n  Employee estimation: filled {filled}/{len(df)} missing values")
+
+    # Fill estimated_years from review count proxy (before scoring so score_years_in_business uses it)
+    if "estimated_years" not in df.columns:
+        df["estimated_years"] = pd.NA
+    age_filled = 0
+    for idx, row in df.iterrows():
+        has_date = pd.notna(row.get("registration_date")) or pd.notna(row.get("established_date"))
+        if not has_date and (pd.isna(row.get("estimated_years")) or row.get("estimated_years") is pd.NA):
+            result = estimate_business_age(row.get("review_count"))
+            if result:
+                df.at[idx, "estimated_years"] = result["estimated_years"]
+                age_filled += 1
+    print(f"  Age estimation:      filled {age_filled}/{len(df)} missing values")
+
+    # Re-extract postal codes where address was updated by enrichment but postal is missing
+    postal_filled = 0
+    for idx, row in df.iterrows():
+        pc = row.get("postal_code")
+        if pd.isna(pc) or str(pc).strip() in ("", "nan"):
+            addr = str(row.get("address_raw", ""))
+            m = re.search(r"[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d", addr)
+            if m:
+                code = m.group().upper().replace(" ", "")
+                df.at[idx, "postal_code"] = code[:3] + " " + code[3:]
+                postal_filled += 1
+    print(f"  Postal code fix:     filled {postal_filled}/{len(df)} missing values")
+
+    # Debug: confirm num_employees and estimated_years are populated
+    emp_count = (pd.to_numeric(df["num_employees"], errors="coerce").fillna(0) > 0).sum()
+    age_count = df["estimated_years"].notna().sum()
+    print(f"  Leads with num_employees populated: {emp_count}/{len(df)}")
+    print(f"  Leads with estimated_years populated: {age_count}/{len(df)}")
 
     # Score each candidate
     print(f"\n  Scoring {len(df)} candidates (8 factors, SDE-calibrated)...")

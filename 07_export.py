@@ -160,31 +160,48 @@ def format_sde_range(sde_low, sde_high):
 
 
 def format_age_range(row):
-    """Format business age from available date fields."""
+    """Format business age from available date fields, falling back to review-count estimate."""
     reg_date = row.get("registration_date") or row.get("established_date")
-    if pd.isna(reg_date) or reg_date is None:
-        return "Unknown"
+    if pd.notna(reg_date) and reg_date is not None:
+        try:
+            reg = pd.to_datetime(reg_date)
+            years = (datetime.now() - reg).days / 365.25
+            if years >= 30:
+                return "30+ years"
+            elif years >= 20:
+                return "20-30 years"
+            elif years >= 15:
+                return "15-20 years"
+            elif years >= 10:
+                return "10-15 years"
+            elif years >= 5:
+                return "5-10 years"
+            elif years >= 2:
+                return "2-5 years"
+            else:
+                return "<2 years"
+        except Exception:
+            pass
 
-    try:
-        reg = pd.to_datetime(reg_date)
-        years = (datetime.now() - reg).days / 365.25
+    # Fallback: estimated_years from review count proxy
+    est = row.get("estimated_years")
+    if est is not None and pd.notna(est):
+        try:
+            y = float(est)
+            if y >= 15:
+                return "15+ years (est.)"
+            elif y >= 10:
+                return "10-15 years (est.)"
+            elif y >= 5:
+                return "5-10 years (est.)"
+            elif y >= 2:
+                return "2-5 years (est.)"
+            else:
+                return "<2 years (est.)"
+        except (ValueError, TypeError):
+            pass
 
-        if years >= 30:
-            return "30+ years"
-        elif years >= 20:
-            return "20-30 years"
-        elif years >= 15:
-            return "15-20 years"
-        elif years >= 10:
-            return "10-15 years"
-        elif years >= 5:
-            return "5-10 years"
-        elif years >= 2:
-            return "2-5 years"
-        else:
-            return "<2 years"
-    except Exception:
-        return "Unknown"
+    return "Unknown"
 
 
 def format_employee_range(emp_count):
@@ -358,7 +375,7 @@ def transform_row(row):
         "address": address,
         "city": city,
         "postal_code": postal,
-        "website": str(row.get("website", "")) if pd.notna(row.get("website")) else "",
+        "website": re.sub(r"[?&]utm_[^#]*", "", str(row.get("website", ""))).rstrip("?&") if pd.notna(row.get("website")) else "",
         "phone": str(row.get("phone", "")) if pd.notna(row.get("phone")) else "",
         "owner_name": owner_name,
         "owner_confidence": owner_confidence,

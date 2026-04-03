@@ -17,6 +17,7 @@ Output: data/google_enriched.csv
 Cost: ~$0.017 per Place Details call. 200 candidates = ~$3.40.
 """
 
+import re
 import requests
 import pandas as pd
 import time
@@ -107,7 +108,8 @@ def enrich_row(row, details):
 
     # Update/add fields from details
     row["phone"] = details.get("formatted_phone_number", row.get("phone", ""))
-    row["website"] = details.get("website", row.get("website", ""))
+    raw_url = details.get("website", row.get("website", "")) or ""
+    row["website"] = re.sub(r"[?&]utm_[^#]*", "", raw_url).rstrip("?&")
     row["google_rating"] = details.get("rating", row.get("google_rating"))
     row["review_count"] = details.get("user_ratings_total", row.get("review_count", 0))
 
@@ -125,6 +127,10 @@ def enrich_row(row, details):
     formatted = details.get("formatted_address", "")
     if formatted:
         row["address_raw"] = formatted
+        pc = re.search(r"[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d", formatted)
+        if pc:
+            code = pc.group().upper().replace(" ", "")
+            row["postal_code"] = code[:3] + " " + code[3:]
 
     # Opening hours as activity signal
     hours = details.get("opening_hours", {})
