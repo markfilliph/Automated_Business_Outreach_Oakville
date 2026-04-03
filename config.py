@@ -262,7 +262,7 @@ SUBSIDIARY_FILTER_ENABLED = True
 # Cached responses cost $0 and do not count toward the cap.
 # To raise a cap, edit here — never remove the cap entirely.
 MAX_COST_USD_00 = 10.00        # Hard cap for step 00 (acquisition).  $0.032/call.
-MAX_COST_USD_03 = 5.00         # Hard cap for step 03 (enrichment).   $0.017/call.
+MAX_COST_USD_03 = 40.00        # Hard cap for step 03 (enrichment).   $0.017/call.
 REQUIRE_CONFIRMATION = True    # Show estimate and ask Y/N before any live calls.
 CHECKPOINT_EVERY_N_CALLS = 25  # Save partial results every N live calls (safety net).
 

@@ -45,7 +45,7 @@ DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
 CACHE_DIR = "data/cache/details"
 
 # Maximum candidates to enrich with Place Details (cost control)
-MAX_DETAILS_CANDIDATES = 200
+MAX_DETAILS_CANDIDATES = 2100
 
 # Fields to request from Place Details (controls billing)
 DETAIL_FIELDS = [
