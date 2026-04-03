@@ -82,6 +82,22 @@ KNOWN_CHAINS = [
     # Gas station chains
     "petro-canada", "esso", "shell", "mobil",
     "ultramar", "pioneer",
+
+    # Plumbing / drain franchise chains
+    "rooter-man", "roto-rooter", "mr. rooter", "drain rescue",
+
+    # Hotel chains and franchises
+    "7-eleven", "homewood suites", "hilton", "marriott",
+    "holiday inn", "best western", "comfort inn", "hampton inn",
+
+    # Waste / facilities management corporations
+    "waste management", "bfi", "gfl environmental", "snap-on",
+
+    # Major Canadian/international construction and engineering corporations
+    # (these are NYSE/TSX-listed firms — never acquisition targets)
+    "pcl constructors", "pcl construction", "ellisdon",
+    "aecon", "graham construction", "bird construction", "ledcor",
+    "stantec", "wsp", "snc-lavalin", "aecom", "jacobs engineering",
 ]
 
 
