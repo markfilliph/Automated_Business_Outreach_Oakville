@@ -60,18 +60,20 @@ def estimate_revenue(row):
 
     Returns (low, mid, high, confidence) tuple.
     Confidence is 0-100 indicating reliability of estimate.
+
+    Approach: collect midpoint estimates from all signals, combine them,
+    then apply a confidence-tiered margin to the combined midpoint to
+    produce the final low/high range. Range width is purely a function
+    of final confidence — tighter when more signals agree.
     """
-    signals = []
+    mids = []
     confidence = 20  # Base confidence
 
     # Signal 1: Employee count (strongest proxy)
     emp = row.get("num_employees")
     if pd.notna(emp) and float(emp) > 0:
         emp = float(emp)
-        rev_emp_low = emp * REVENUE_ESTIMATION["per_employee_low"]
-        rev_emp_high = emp * REVENUE_ESTIMATION["per_employee_high"]
-        rev_emp_mid = emp * REVENUE_ESTIMATION["per_employee_mid"]
-        signals.append(("employees", rev_emp_low, rev_emp_mid, rev_emp_high))
+        mids.append(emp * REVENUE_ESTIMATION["per_employee_mid"])
         confidence += 25
 
     # Signal 2: Review count (weak proxy, better for B2C)
@@ -79,28 +81,18 @@ def estimate_revenue(row):
     if pd.notna(reviews) and float(reviews) > 0:
         reviews = float(reviews)
         if reviews >= REVIEW_THRESHOLDS["excellent"]:
-            rev_review_mid = 3_000_000
+            mids.append(3_000_000)
         elif reviews >= REVIEW_THRESHOLDS["good"]:
-            rev_review_mid = 2_000_000
+            mids.append(2_000_000)
         elif reviews >= REVIEW_THRESHOLDS["moderate"]:
-            rev_review_mid = 1_500_000
+            mids.append(1_500_000)
         elif reviews >= REVIEW_THRESHOLDS["low"]:
-            rev_review_mid = 1_000_000
+            mids.append(1_000_000)
         else:
-            rev_review_mid = 700_000
-        if confidence >= 45:
-            margin = REVENUE_ESTIMATION["confidence_margin_high"]
-        elif confidence >= 30:
-            margin = REVENUE_ESTIMATION["confidence_margin_moderate"]
-        else:
-            margin = REVENUE_ESTIMATION["confidence_margin_low"]
-        signals.append(("reviews",
-                        rev_review_mid * (1 - margin),
-                        rev_review_mid,
-                        rev_review_mid * (1 + margin)))
+            mids.append(700_000)
         confidence += 10
 
-    # Signal 3: Business age
+    # Signal 3: Business age (modifies midpoint, does not add a separate signal)
     reg_date = row.get("registration_date") or row.get("established_date")
     if pd.notna(reg_date):
         try:
@@ -114,24 +106,29 @@ def estimate_revenue(row):
                 age_factor = 1.0
             else:
                 age_factor = 0.8
-            # Age modifies the base, not an independent signal
             confidence += 10
         except Exception:
             age_factor = 1.0
     else:
         age_factor = 1.0
 
-    # Combine signals
-    if signals:
-        avg_low = sum(s[1] for s in signals) / len(signals) * age_factor
-        avg_mid = sum(s[2] for s in signals) / len(signals) * age_factor
-        avg_high = sum(s[3] for s in signals) / len(signals) * age_factor
+    # Combine signal midpoints
+    if mids:
+        avg_mid = (sum(mids) / len(mids)) * age_factor
     else:
-        # No signals at all: use broad base range
         base = REVENUE_ESTIMATION["base_range"]
-        avg_low = base[0]
         avg_mid = (base[0] + base[1]) / 2
-        avg_high = base[1]
+
+    # Select margin tier based on final confidence, then apply once
+    if confidence >= 60:
+        margin = REVENUE_ESTIMATION["confidence_margin_high"]
+    elif confidence >= 40:
+        margin = REVENUE_ESTIMATION["confidence_margin_moderate"]
+    else:
+        margin = REVENUE_ESTIMATION["confidence_margin_low"]
+
+    avg_low = avg_mid * (1 - margin)
+    avg_high = avg_mid * (1 + margin)
 
     return avg_low, avg_mid, avg_high, min(confidence, 85)
 
