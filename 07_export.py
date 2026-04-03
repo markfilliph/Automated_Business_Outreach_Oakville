@@ -382,9 +382,41 @@ def main():
     df = pd.read_csv(CHECKPOINT_SCORED)
     print(f"  [INPUT] {len(df)} scored candidates from {CHECKPOINT_SCORED}")
 
-    # Take top N by score
+    # Take top N by score, then hard-filter SDE out-of-range leads
     top = df.head(TARGET_FINAL_LEADS).copy()
     print(f"  [SELECT] Top {len(top)} candidates (target: {TARGET_FINAL_LEADS})")
+
+    # Hard SDE filter — remove leads whose ENTIRE range is outside target
+    below_mask = top["estimated_sde_high"].fillna(0).astype(float) < TARGET_SDE_LOW
+    above_mask = top["estimated_sde_low"].fillna(float("inf")).astype(float) > TARGET_SDE_HIGH
+    n_below = below_mask.sum()
+    n_above = above_mask.sum()
+
+    if n_below or n_above:
+        print(f"\n  SDE hard filter:")
+        print(f"    Removed (entire range below ${TARGET_SDE_LOW:,.0f}): {n_below}")
+        print(f"    Removed (entire range above ${TARGET_SDE_HIGH:,.0f}): {n_above}")
+        top = top[~below_mask & ~above_mask].copy()
+
+        # Backfill from remaining scored candidates not already in top
+        shortfall = TARGET_FINAL_LEADS - len(top)
+        if shortfall > 0:
+            already_in = top.index
+            pool = df.drop(index=already_in.intersection(df.index), errors="ignore")
+            # Apply same SDE filter to pool
+            pool_below = pool["estimated_sde_high"].fillna(0).astype(float) < TARGET_SDE_LOW
+            pool_above = pool["estimated_sde_low"].fillna(float("inf")).astype(float) > TARGET_SDE_HIGH
+            pool = pool[~pool_below & ~pool_above]
+            # Exclude rows already in top by position
+            pool = pool[~pool.index.isin(already_in)]
+            backfill = pool.head(shortfall)
+            top = pd.concat([top, backfill], ignore_index=True)
+            print(f"    Backfilled {len(backfill)} replacement leads from scored pool")
+            if len(backfill) < shortfall:
+                print(f"  [WARN] Only {len(top)} in-range leads available (target was {TARGET_FINAL_LEADS})")
+        print(f"    Final count after SDE filter: {len(top)}")
+    else:
+        print(f"  SDE hard filter: all {len(top)} leads within range — no removals")
 
     # Transform each row
     print(f"\n  Transforming to Hamilton standard 17-field format...")
