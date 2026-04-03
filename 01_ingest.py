@@ -76,16 +76,65 @@ def extract_city(address):
     return "Oakville"
 
 
+_LOCATION_TAGS = [
+    "oakville", "burlington", "mississauga", "toronto",
+    "hamilton", "brampton", "milton", "gta",
+]
+
+_PROMO_PARENS = re.compile(
+    r'\s*\([^)]*(?:works at|located in|serving|your #1|best in)[^)]*\)',
+    re.IGNORECASE,
+)
+
+_CORPORATE_PARENS = re.compile(
+    r'\([^)]*(?:canada|ontario|inc\.|ltd\.|corp\.|llc)[^)]*\)',
+    re.IGNORECASE,
+)
+
+
 def clean_company_name(name):
-    """Clean and normalize company name."""
+    """Clean and normalize company name.
+
+    Cleaning steps (applied in order after encoding fixes):
+      1. Strip pipe-delimited marketing suffixes.
+      2. Strip trailing location tags after ' - '.
+      3. Strip promotional parenthetical phrases.
+      4. Collapse comma-separated service lists (3+ segments → keep first).
+      5. Re-trim and remove trailing punctuation.
+    """
     if pd.isna(name):
         return ""
     name = str(name).strip()
-    # Fix common encoding issues
+
+    # Encoding fixes
     name = name.replace("\u2019", "'").replace("\u2013", " ").replace("\u2014", " ")
     name = name.replace("&amp;", "&")
-    # Remove excessive whitespace
     name = re.sub(r"\s+", " ", name)
+
+    # 1. Strip everything after the first pipe
+    if "|" in name:
+        name = name.split("|")[0].strip()
+
+    # 2. Strip trailing location tag after ' - '
+    #    Only strip the LAST dash-segment if it is a known city/region.
+    parts = name.split(" - ")
+    if len(parts) > 1:
+        last = parts[-1].strip().lower()
+        if any(loc in last for loc in _LOCATION_TAGS):
+            name = " - ".join(parts[:-1]).strip()
+
+    # 3. Strip promotional parentheses; preserve corporate ones
+    if _PROMO_PARENS.search(name) and not _CORPORATE_PARENS.search(name):
+        name = _PROMO_PARENS.sub("", name).strip()
+
+    # 4. Collapse comma-separated service lists (3+ segments → keep first)
+    comma_parts = [p.strip() for p in name.split(",")]
+    if len(comma_parts) >= 3:
+        name = comma_parts[0]
+
+    # 5. Final trim and remove trailing punctuation
+    name = name.strip().rstrip(".,- ")
+
     return name
 
 
