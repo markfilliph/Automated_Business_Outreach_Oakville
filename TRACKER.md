@@ -1,7 +1,7 @@
 # Oakville Acquisition MVP — Project Tracker
 
 **Goal:** Generate 100 scored acquisition leads (SDE $250K–$500K, Oakville ON)
-**Last updated:** 2026-04-03
+**Last updated:** 2026-04-03 (session 2)
 
 ---
 
@@ -77,7 +77,7 @@
 
 ---
 
-## PHASE 4 — QUALITY FIXES
+## PHASE 4 — QUALITY FIXES (Session 1)
 
 | # | Task | File(s) | Status | Notes |
 |---|------|---------|--------|-------|
@@ -90,6 +90,22 @@
 | 4.7 | Tighten geographic filter — adjacent municipality spill | `02_filter.py` | ✅ Done | Stage B hard-excludes Burlington (L7L–L7T) and Mississauga (L5A–L5L) postal prefixes even if lat/lng overlaps |
 | 4.8 | Add business age estimation from Google data | `utils/employee_estimator.py`, `03_enrich_google.py`, `06_score.py` | ✅ Done | `estimate_business_age()` uses review count proxy; stored as `estimated_years`; used as fallback in `score_years_in_business()` |
 | 4.9 | Raise enrichment cap to cover all filtered candidates | `config.py`, `03_enrich_google.py` | ✅ Done | `MAX_COST_USD_03` $5→$40; `MAX_DETAILS_CANDIDATES` 200→2100; enriches all 2,049 candidates (~$35 at $0.017/call) |
+
+---
+
+## PHASE 5 — REVENUE MODEL FIXES (Session 2)
+
+| # | Task | File(s) | Status | Notes |
+|---|------|---------|--------|-------|
+| 5.1 | Fix revenue estimates — employee midpoint not feeding into estimate_revenue() | `06_score.py` | ✅ Done | `scored_candidates.csv` was pre-Task-5; re-run after fixes confirmed 100/100 `num_employees` populated |
+| 5.2 | Fix business age — `estimated_years` not in export | `07_export.py` | ✅ Done | `format_age_range()` now uses `estimated_years` fallback with "(est.)" label; age "Unknown" dropped from 100% to 0% |
+| 5.3 | Fix postal code — enriched address not re-parsed | `03_enrich_google.py`, `06_score.py` | ✅ Done | `enrich_row()` re-extracts postal from `formatted_address`; `06_score.py` backfills remaining gaps before scoring |
+| 5.4 | Strip UTM tracking params from website URLs | `03_enrich_google.py`, `07_export.py` | ✅ Done | Stripped at enrichment time and at export time; existing cached data cleaned without re-running step 03 |
+| 5.5 | Fix `08_export_excel.py` crash on missing `review_status` | `08_export_excel.py` | ✅ Done | Guard added: column created as empty string if not present (only exists after `09_review_queue.py` runs) |
+| 5.6 | Narrow per-employee revenue multipliers | `config.py` | ✅ Done | `per_employee_low` $100K→$120K, `per_employee_high` $220K→$185K; tighter range defensible now that employee heuristics are populated |
+| 5.7 | Add confidence-based margin tiers | `config.py` | ✅ Done | Single `confidence_margin` 0.30 replaced with `confidence_margin_low/moderate/high` (0.30/0.15/0.08) |
+| 5.8 | Apply tiered margins to final combined midpoint | `06_score.py` | ✅ Done | Margin selected on **final** confidence (after all signals); applied once to `avg_mid` — range width purely a confidence function |
+| 5.9 | Industry-specific per-employee revenue multipliers | `config.py`, `06_score.py` | ✅ Done | `INDUSTRY_REVENUE_PER_EMPLOYEE` dict with 13 industry tuples; `estimate_revenue(row, industry)` uses industry mid instead of global flat rate |
 
 ---
 
