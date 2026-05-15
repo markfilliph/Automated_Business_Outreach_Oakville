@@ -63,8 +63,21 @@ from utils.subsidiary_detector import is_subsidiary
 from utils.employee_estimator import estimate_employee_range, estimate_business_age
 
 TEXT_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
 CACHE_DIR = "data/cache/acquisition"
+DETAILS_CACHE_DIR = "data/cache/details"
 COST_PER_CALL = 0.032
+COST_PER_DETAILS_CALL = 0.017
+DETAIL_FIELDS = [
+    "name",
+    "formatted_address",
+    "formatted_phone_number",
+    "website",
+    "rating",
+    "user_ratings_total",
+    "types",
+    "business_status",
+]
 
 # ── Industry definitions ────────────────────────────────────────────────────
 
@@ -348,6 +361,77 @@ def fetch_keyword(keyword, seen_ids):
             seen_ids.add(pid)
 
     return new_records, live_calls
+
+
+# ── Place Details enrichment ─────────────────────────────────────────────────
+
+def fetch_place_details(place_id):
+    """Fetch Place Details for one place_id. Uses same cache dir as 03_enrich_google.py."""
+    os.makedirs(DETAILS_CACHE_DIR, exist_ok=True)
+    key_str = json.dumps({"place_id": place_id}, sort_keys=True)
+    h = hashlib.md5(key_str.encode()).hexdigest()[:12]
+    c_path = os.path.join(DETAILS_CACHE_DIR, f"details_{h}.json")
+
+    if CACHE_ENABLED and os.path.exists(c_path):
+        try:
+            with open(c_path, "r") as f:
+                return json.load(f), True
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    params = {
+        "place_id": place_id,
+        "fields": ",".join(DETAIL_FIELDS),
+        "key": GOOGLE_PLACES_API_KEY,
+    }
+    try:
+        resp = requests.get(DETAILS_URL, params=params, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("status") == "OK":
+            result = data.get("result", {})
+            if CACHE_ENABLED:
+                with open(c_path, "w") as f:
+                    json.dump(result, f)
+            return result, False
+        return None, False
+    except requests.RequestException as e:
+        print(f"    [ERROR] Details fetch failed for {place_id}: {e}")
+        return None, False
+
+
+def enrich_with_details(df):
+    """Fetch Place Details for all rows in df, populating phone/website/postal/address."""
+    live_calls = 0
+    cost = 0.0
+    for idx, row in df.iterrows():
+        pid = row.get("google_place_id")
+        if not pid:
+            continue
+        details, was_cached = fetch_place_details(str(pid))
+        if not was_cached:
+            live_calls += 1
+            cost += COST_PER_DETAILS_CALL
+            time.sleep(GOOGLE_DELAY_SECONDS)
+        if not details:
+            continue
+        phone = details.get("formatted_phone_number")
+        if phone:
+            df.at[idx, "phone"] = phone
+        raw_url = details.get("website") or ""
+        if raw_url:
+            df.at[idx, "website"] = re.sub(r"[?&]utm_[^#]*", "", raw_url).rstrip("?&")
+        new_types = details.get("types", [])
+        if new_types:
+            df.at[idx, "google_types"] = ",".join(new_types)
+        formatted = details.get("formatted_address", "")
+        if formatted:
+            df.at[idx, "address_raw"] = formatted
+            pc = re.search(r"[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d", formatted)
+            if pc:
+                code = pc.group().upper().replace(" ", "")
+                df.at[idx, "postal_code"] = code[:3] + " " + code[3:]
+    return df, live_calls, cost
 
 
 # ── Filtering ───────────────────────────────────────────────────────────────
@@ -736,7 +820,7 @@ def to_standard_row(row, scored):
         "business_name":            str(row.get("company_name", "")),
         "address":                  str(row.get("address_raw", "")),
         "city":                     "Oakville",
-        "postal_code":              "",
+        "postal_code":              str(row.get("postal_code", "")) if row.get("postal_code") else "",
         "website":                  str(row.get("website", "")) if row.get("website") else "",
         "phone":                    str(row.get("phone", "")) if row.get("phone") else "",
         "owner_name":               "Not found",
@@ -1008,6 +1092,16 @@ Examples:
     if actual_count < lead_count:
         print(f"\n  [NOTE] Only {actual_count} leads available (requested {lead_count}).")
         print(f"         Try adding more industries or removing --exclude-existing.")
+
+    # ── Place Details enrichment (phone, website, postal) ────────────────────
+    print(f"\n  Fetching Place Details for {len(top)} leads...")
+    top, details_live, details_cost = enrich_with_details(top)
+    total_live_calls += details_live
+    if details_live:
+        print(f"  Place Details: {details_live} live (${details_cost:.2f}), "
+              f"{len(top) - details_live} cached ($0.00)")
+    else:
+        print(f"  Place Details: all {len(top)} served from cache ($0.00)")
 
     # ── Transform to Hamilton standard ──────────────────────────────────────
     leads = []
